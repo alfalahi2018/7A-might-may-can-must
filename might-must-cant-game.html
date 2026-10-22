@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Might, Must, Can’t: Detective Game</title>
+<style>
+:root{--ink:#2a1b4d;--paper:#fffaf0;--ok:#1fa85a;--bad:#e0453a;--c:#336b47;--cl:#dff0e4}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Trebuchet MS","Segoe UI",Arial,sans-serif;color:var(--ink);background:linear-gradient(160deg,#e3f2e8 0%,#f7e1ea 50%,#e9dff6 100%);min-height:100vh}
+.wrap{max-width:760px;margin:0 auto;padding:14px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.logo{font-size:1.5rem;font-weight:900;background:#fff;border-radius:40px;padding:6px 20px;border:4px solid #6a4189}
+.stats{display:flex;gap:8px;align-items:center}
+.pill{background:#fff;border:3px solid #cdbbe0;border-radius:30px;padding:6px 14px;font-weight:800}
+button{font-family:inherit;cursor:pointer}
+.mute{border:3px solid #cdbbe0;background:#fff;border-radius:50%;width:44px;height:44px;font-size:1.3rem}
+.bar{height:14px;background:#fff;border-radius:10px;margin:12px 0;overflow:hidden;border:2px solid #cdbbe0}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#336b47,#964a67,#6a4189);transition:width .5s}
+.card{background:var(--paper);border:4px solid var(--c);border-radius:26px;padding:20px;margin:12px 0;box-shadow:0 6px 0 rgba(42,27,77,.12)}
+h1,h2{margin:.2em 0}
+.tag{display:inline-block;background:var(--cl);border-radius:12px;padding:4px 12px;font-weight:800}
+.big{font-size:3.4rem;text-align:center;margin:6px 0}
+.sent{font-size:1.6rem;font-weight:900;text-align:center;line-height:1.4;margin:6px 0}
+.clue{text-align:center;font-size:1.1rem;font-weight:700;opacity:.85}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{background:#fff;border:3px solid var(--cl);border-radius:16px;padding:8px 12px;font-weight:700;font-size:1.05rem;color:var(--ink)}
+.chip:hover{transform:scale(1.04)}
+.btn{background:#6a4189;color:#fff;border:0;border-bottom:5px solid #442760;border-radius:16px;padding:12px 26px;font-size:1.15rem;font-weight:900;margin:10px 6px 0 0}
+.btn:active{transform:translateY(3px);border-bottom-width:2px}
+.btn.g{background:#336b47;border-bottom-color:#1d4429}
+input[type=text],textarea{width:100%;font:inherit;font-size:1.4rem;text-align:center;padding:10px;border:4px solid var(--cl);border-radius:16px;color:var(--ink);background:#fff}
+textarea{font-size:1.15rem;text-align:left;min-height:80px}
+input:focus,textarea:focus,button:focus-visible{outline:4px solid #ffb62e}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.opt{background:#fff;border:4px solid var(--cl);border-radius:18px;padding:14px;font-size:1.25rem;font-weight:800;color:var(--ink)}
+.opt:hover{transform:translateY(-2px)}
+.opt.right{background:#c9f3d8;border-color:var(--ok)}
+.opt.wrong{background:#ffd5d0;border-color:var(--bad)}
+.fb{min-height:32px;text-align:center;font-weight:900;font-size:1.15rem;margin-top:10px}
+.fb.ok{color:var(--ok)}.fb.no{color:var(--bad)}
+.shake{animation:sh .4s}
+@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.pop{animation:pp .5s}
+@keyframes pp{50%{transform:scale(1.05)}}
+.stars{font-size:3rem;text-align:center}
+.fall{position:fixed;top:-40px;font-size:2rem;pointer-events:none;animation:fl 2.8s linear forwards;z-index:9}
+@keyframes fl{to{transform:translateY(110vh) rotate(360deg)}}
+footer{text-align:center;font-weight:800;margin:18px 0 6px}
+.rule{font-size:1.05rem;line-height:1.7}
+.center{text-align:center}
+.meter{display:flex;gap:6px;margin:8px 0}
+.meter span{flex:1;text-align:center;border-radius:12px;padding:8px 4px;font-weight:900;color:#fff}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <div class="logo">🔍 Might · Must · Can’t</div>
+ <div class="stats"><span class="pill">⭐ <span id="sc">0</span></span><span class="pill">🔥 <span id="st">0</span></span><button class="mute" id="mu" aria-label="Sound on or off">🔊</button></div>
+</header>
+<div class="bar"><i id="pg"></i></div>
+<main id="app"></main>
+<footer>Created by T.Badria Alfalahi ✨</footer>
+</div>
+<script>
+let ctx,muted=false,score=0,streak=0,best=0,idx=-1,name="",tries=0,locked=false,log=[];
+const $=id=>document.getElementById(id);
+function ac(){if(!ctx){try{ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ctx&&ctx.state==="suspended")ctx.resume();return ctx}
+function tone(f,d,type="sine",delay=0,vol=.2){if(muted)return;const c=ac();if(!c)return;const t=c.currentTime+delay,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+d)}
+const sfx={
+ click:()=>tone(660,.08,"square",0,.08),
+ ok:()=>[523,659,784,1046].forEach((f,i)=>tone(f,.18,"triangle",i*.09,.22)),
+ no:()=>{tone(200,.25,"sawtooth",0,.15);tone(150,.3,"sawtooth",.15,.15)},
+ win:()=>[523,659,784,659,784,1046,1318].forEach((f,i)=>tone(f,.25,"triangle",i*.13,.25)),
+ star:()=>tone(1200,.15,"sine",0,.15)
+};
+function speak(t){if(muted||!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/_+/g,"blank"));u.lang="en-US";u.rate=.85;speechSynthesis.speak(u)}
+function confetti(n=24){const e=["🎉","⭐","🌟","✨","🔍"];for(let i=0;i<n;i++){const s=document.createElement("span");s.className="fall";s.textContent=e[i%e.length];s.style.left=Math.random()*100+"vw";s.style.animationDelay=Math.random()*.8+"s";document.body.appendChild(s);setTimeout(()=>s.remove(),3800)}}
+$("mu").onclick=()=>{muted=!muted;$("mu").textContent=muted?"🔇":"🔊";if(muted&&window.speechSynthesis)speechSynthesis.cancel();else sfx.click()};
+
+const SEC={
+ A:{n:"Circle the correct word",c:"#336b47",l:"#dff0e4"},
+ B:{n:"Match: might, must, can’t",c:"#336b47",l:"#dff0e4"},
+ C:{n:"Choose the correct answer",c:"#964a67",l:"#f8e1ea"},
+ D:{n:"Correct the underlined word",c:"#964a67",l:"#f8e1ea"},
+ E:{n:"Complete. Use one word",c:"#6a4189",l:"#eadff6"},
+ F:{n:"Read the clues. Write sentences",c:"#6a4189",l:"#eadff6"}
+};
+const M=["a. sure no","b. maybe","c. sure yes"];
+const Q=[
+ {p:"A",t:"pick",s:"Maybe. It ___ be a cat.",o:["might","must"],a:["might"],e:"🐱",h:"“Maybe” means it is possible: use might."},
+ {p:"A",t:"pick",s:"It has paws. It ___ be an eagle.",o:["can’t","must"],a:["can’t"],e:"🦅",h:"An eagle has no paws. You are sure it is NOT an eagle."},
+ {p:"A",t:"pick",s:"It might ___ a rabbit.",o:["be","is"],a:["be"],e:"🐇",h:"After might we use the base verb."},
+ {p:"B",t:"pick",s:"might = ?",o:M,a:["b. maybe"],e:"🤔",h:"might means it is possible, but you are not sure."},
+ {p:"B",t:"pick",s:"must = ?",o:M,a:["c. sure yes"],e:"✅",h:"must means you are sure it is true."},
+ {p:"B",t:"pick",s:"can’t = ?",o:M,a:["a. sure no"],e:"❌",h:"can’t means you are sure it is not true."},
+ {p:"C",t:"pick",s:"It ___ be a snake. It has legs.",o:["must","can’t","may"],a:["can’t"],e:"🐍",h:"A snake has no legs, so you are sure it is not a snake."},
+ {p:"C",t:"pick",s:"It may ___ behind the tree.",o:["hide","hid","hidden"],a:["hide"],e:"🌳",h:"After may use the base verb."},
+ {p:"C",t:"pick",s:"I’m not sure. It ___ be a cat.",o:["can’t","must","could"],a:["could"],e:"🐈",h:"“I’m not sure” means maybe."},
+ {p:"D",t:"type",s:"It might <u>is</u> a rabbit.",a:["be"],e:"✏️",h:"After might use the base verb."},
+ {p:"D",t:"type",s:"It could <u>has</u> a long tail.",a:["have"],e:"✏️",h:"After could use the base verb."},
+ {p:"D",t:"type",s:"It may <u>ate</u> the fish.",a:["eat"],e:"✏️",h:"After may use the base verb."},
+ {p:"E",t:"type",s:"It ______ be an eagle.",c:"It has fur and paws.",a:["can’t","cant","cannot"],e:"🦅",h:"An eagle has no fur. You are sure it is not an eagle."},
+ {p:"E",t:"type",s:"It ______ be a cat.",c:"It says “meow”.",a:["must"],e:"🐱",h:"Only a cat says meow. You are sure."},
+ {p:"E",t:"type",s:"It might ______ a long tail.",a:["have"],e:"🐾",h:"After might use the base verb (own or possess)."},
+ {p:"F",t:"write",s:"You see fur, but nothing else.",c:"Write a possible guess.",m:/\b(might|may|could)\b/,w:"be",ex:"It might be a cat.",e:"🐾"},
+ {p:"F",t:"write",s:"You see paws.",c:"Rule out a bird.",m:/\b(can['’]?t|cannot)\b/,w:"be",must:/bird/,ex:"It can’t be a bird.",e:"🐾"},
+ {p:"F",t:"write",s:"You hear “meow”.",c:"You are sure.",m:/\bmust\b/,w:"be",ex:"It must be a cat.",e:"🔊"}
+];
+const MAXPTS=Q.length*10;
+const norm=s=>s.toLowerCase().replace(/[’‘`]/g,"'").trim();
+const plain=s=>s.replace(/<[^>]+>/g,"");
+function theme(p){const c=SEC[p];document.documentElement.style.setProperty("--c",c.c);document.documentElement.style.setProperty("--cl",c.l)}
+
+function hud(){$("sc").textContent=score;$("st").textContent=streak;$("pg").style.width=Math.max(0,idx)/Q.length*100+"%"}
+function start(){
+ theme("A");
+ $("app").innerHTML=`<div class="card center pop"><div class="big">🐱🦅🐇🐍</div>
+ <h1>Who could it be?</h1><p>Be a detective! Use <b>might</b>, <b>must</b> and <b>can’t</b> to guess the animal.</p>
+ <p><input type="text" id="nm" maxlength="20" placeholder="Type your name" aria-label="Your name" autocomplete="off"></p>
+ <button class="btn" onclick="go()">Start the case</button></div>`;hud()
+}
+function go(){ac();name=($("nm").value||"Super Detective").trim();sfx.click();speak("Hello "+name+"! Let's learn about might, must and can't.");learn()}
+function say(t){sfx.click();speak(t)}
+function learn(){
+ theme("A");
+ $("app").innerHTML=`<div class="card pop"><h2>Hello, ${name}! 👋</h2><p>Tap any sentence to hear it. Then start the game!</p></div>
+ <div class="card"><div class="meter"><span style="background:#964a67">can’t = sure no</span><span style="background:#e0a21a">might = maybe</span><span style="background:#336b47">must = sure yes</span></div></div>
+ <div class="card"><span class="tag">might · may · could</span><p class="rule">You are <b>not sure</b>. Maybe it is true.</p><div class="chips"><button class="chip" onclick="say('It might be a cat.')">🐱 It might be a cat.</button><button class="chip" onclick="say('It may hide behind the tree.')">🌳 It may hide behind the tree.</button><button class="chip" onclick="say('It could have a long tail.')">🐾 It could have a long tail.</button></div></div>
+ <div class="card"><span class="tag">must</span><p class="rule">You are <b>sure</b> it is true.</p><div class="chips"><button class="chip" onclick="say('It says meow. It must be a cat.')">🐱 It says “meow”. It must be a cat.</button></div></div>
+ <div class="card"><span class="tag">can’t</span><p class="rule">You are <b>sure</b> it is <b>not</b> true.</p><div class="chips"><button class="chip" onclick="say('It has paws. It can not be an eagle.')">🦅 It has paws. It can’t be an eagle.</button></div></div>
+ <p class="center rule">✨ After might, may, could, must and can’t, use the <b>base verb</b>: be, have, eat, hide.</p>
+ <div class="center"><button class="btn g" onclick="next()">I’m ready! 🚀</button></div>`
+}
+function next(){idx++;tries=0;locked=false;sfx.click();hud();if(idx>=Q.length)return end();theme(Q[idx].p);render()}
+function head(q){return `<span class="tag">${q.p} · ${SEC[q.p].n}</span> <span style="float:right;font-weight:800">${idx+1} / ${Q.length}</span>`}
+function render(){
+ const q=Q[idx];let h=`<div class="card pop">${head(q)}<div class="big">${q.e}</div><div class="sent">${q.s}</div>${q.c?`<div class="clue">${q.c}</div>`:""}`;
+ if(q.t==="pick"){
+  const o=q.o.map((x,i)=>[x,i]);if(q.p!=="B")o.sort(()=>Math.random()-.5);
+  h+=`<div class="opts">${o.map(([x,i])=>`<button class="opt" onclick="pick(this,${i})">${x}</button>`).join("")}</div>`
+ }else if(q.t==="type"){
+  h+=`<p><input type="text" id="an" placeholder="Type one word" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Answer"></p><div class="center"><button class="btn" id="ck" onclick="checkType()">Check ✔</button></div>`
+ }else{
+  h+=`<p><textarea id="an" placeholder="Write your sentence here" aria-label="Your sentence"></textarea></p><div class="center"><button class="btn" id="ck" onclick="checkWrite()">Check ✔</button></div>`
+ }
+ h+=`<div class="fb" id="fb" aria-live="polite"></div><div class="center" id="nx"></div></div>`;
+ $("app").innerHTML=h;
+ if(q.t==="type"){$("an").focus();$("an").addEventListener("keydown",e=>{if(e.key==="Enter")checkType()})}
+ speak(plain(q.s)+" "+(q.c||""))
+}
+function good(pts,msg){
+ locked=true;score+=pts;streak++;best=Math.max(best,streak);hud();sfx.ok();
+ const f=$("fb");f.className="fb ok";f.textContent=msg+" +"+pts;
+ if(streak%3===0){setTimeout(()=>{sfx.star();confetti(14)},350);f.textContent+="  🔥 "+streak+" in a row!"}
+ log.push(1);nextBtn()
+}
+function bad(){streak=0;hud();sfx.no();const c=$("app").firstElementChild;c.classList.remove("shake");void c.offsetWidth;c.classList.add("shake")}
+function nextBtn(){$("nx").innerHTML=`<button class="btn g" onclick="next()">${idx===Q.length-1?"See my result 🏆":"Next ➜"}</button>`;if($("ck"))$("ck").style.display="none"}
+function reveal(ans){locked=true;log.push(0);const f=$("fb");f.className="fb no";f.innerHTML=`The answer is: <b>${ans}</b>`;nextBtn()}
+function full(q){return q.s.replace(/<[^>]+>/g,"").replace(/_+/g,q.a[0])}
+function pick(b,i){
+ if(locked)return;const q=Q[idx],v=q.o[i];
+ if(q.a.includes(v)){b.classList.add("right");good(tries===0?10:5,tries===0?"Great! 🎉":"Good job! 👍");speak(q.p==="B"?q.s.replace("=","means")+" "+v.slice(3):full(q));return}
+ b.classList.add("wrong");b.disabled=true;tries++;bad();
+ if(tries>=2){document.querySelectorAll(".opt").forEach(x=>{if(q.a.includes(x.textContent))x.classList.add("right")});reveal(q.a[0]);return}
+ const f=$("fb");f.className="fb no";f.textContent="Not yet. Hint: "+q.h
+}
+function checkType(){
+ if(locked)return;const q=Q[idx],v=norm($("an").value);if(!v){$("an").focus();return}
+ if(q.a.map(norm).includes(v)){good(tries===0?10:5,tries===0?"Perfect! 🎉":"Good job! 👍");speak(full(q));return}
+ tries++;bad();
+ if(tries>=2)return reveal(q.a[0]);
+ const f=$("fb");f.className="fb no";f.textContent="Not yet. Hint: "+q.h;$("an").select()
+}
+function checkWrite(){
+ if(locked)return;const q=Q[idx],raw=$("an").value.trim(),v=norm(raw),f=$("fb");
+ const okM=q.m.test(v),okB=new RegExp("\\b"+q.w+"\\b").test(v),okX=q.must?q.must.test(v):/\b(a|an)\s+\w+/.test(v);
+ const cap=/^[A-Z]/.test(raw),end=/[.!?]$/.test(raw);
+ if(!okM||!okB){tries++;bad();f.className="fb no";f.textContent=q.p==="F"&&q.must?"Use can’t + be + the animal.":"Use the right word (might, may, could, must or can’t) + be.";if(tries>=2){locked=true;log.push(0);f.innerHTML=`Example: <b>${q.ex}</b>`;speak(q.ex);nextBtn()}return}
+ const pts=5+(okX?2:0)+(cap?1.5:0)+(end?1.5:0),tips=[];
+ if(!okX)tips.push("name an animal (a cat, a bird…)");if(!cap)tips.push("use a capital letter");if(!end)tips.push("end with a full stop");
+ locked=true;score+=pts;hud();sfx.ok();f.className="fb ok";
+ if(pts===10){streak++;best=Math.max(best,streak);hud();f.textContent="Wonderful sentence! +10";log.push(1)}
+ else{streak=0;hud();f.textContent=`Nice! +${pts}. Next time: ${tips.join(", ")}.`;log.push(pts>=7?1:0)}
+ speak(raw);nextBtn()
+}
+function end(){
+ hud();$("pg").style.width="100%";theme("E");const sc=Math.round(score*10)/10,pc=Math.round(score/MAXPTS*100),st=pc>=85?3:pc>=60?2:pc>=30?1:0;
+ const msg=["Keep practising. You can do it! 💪","Good start! Try again for more stars.","Great detective work! Almost perfect!","Amazing! You are a might-must-can’t expert!"][st];
+ sfx.win();confetti(40);speak("Well done "+name+"! Your score is "+sc+" out of "+MAXPTS);
+ $("app").innerHTML=`<div class="card center pop"><h1>Case closed, ${name}! 🏆</h1>
+ <div class="stars">${"⭐".repeat(st)}${"☆".repeat(3-st)}</div>
+ <h2>${sc} / ${MAXPTS} points (${pc}%)</h2>
+ <p>Correct answers: <b>${log.filter(Boolean).length}</b> / ${Q.length} &nbsp;·&nbsp; Best streak: <b>🔥 ${best}</b></p>
+ <p class="rule">${msg}</p>
+ <button class="btn" onclick="again()">Play again 🔄</button><button class="btn g" onclick="idx=-1;learn()">Review rules 📘</button></div>`
+}
+function again(){score=0;streak=0;best=0;idx=-1;log=[];sfx.click();hud();learn()}
+start();
+</script>
+</body>
+</html>
